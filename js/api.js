@@ -36,7 +36,7 @@ async function pedir(metodo, ruta, cuerpo) {
     }
 
     // token vencido o invalido: app.js escucha este evento y vuelve al login
-    if (respuesta.status === 401 && ruta !== "/login") {
+    if (respuesta.status === 401 && ruta !== "/login" && ruta !== "/registro") {
         window.dispatchEvent(new CustomEvent("sesion-vencida", { detail: datos && datos.error }));
     }
     if (!respuesta.ok) {
@@ -47,12 +47,19 @@ async function pedir(metodo, ruta, cuerpo) {
 
 const api = {
     login: (datos) => pedir("POST", "/login", datos),
+    registro: (datos) => pedir("POST", "/registro", datos),
+    catalogo: () => pedir("GET", "/catalogo"),
+    // ficha de un producto: { producto, resenas }
+    detalleProducto: (id) => pedir("GET", "/catalogo/" + id),
+    publicarResena: (productoId, datos) => pedir("POST", "/catalogo/" + productoId + "/resenas", datos),
+    borrarResena: (id) => pedir("DELETE", "/resenas/" + id),
     sesion: () => pedir("GET", "/sesion"),
 
     usuarios: {
         listar: () => pedir("GET", "/usuarios"),
         crear: (datos) => pedir("POST", "/usuarios", datos),
         cambiarActivo: (id, activo) => pedir("PUT", "/usuarios/" + id + "/activo", { activo }),
+        cambiarRol: (id, rol) => pedir("PUT", "/usuarios/" + id + "/rol", { rol }),
     },
 
     productos: {

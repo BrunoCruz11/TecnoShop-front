@@ -8,8 +8,39 @@ function esc(valor) {
         ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
+// precios en pesos uruguayos: $U 1.790 (con centavos solo si los tiene)
 function plata(numero) {
-    return "$ " + Number(numero).toLocaleString("es-UY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const n = Number(numero);
+    const decimales = Number.isInteger(n) ? 0 : 2;
+    return "$U " + n.toLocaleString("es-UY", { minimumFractionDigits: decimales, maximumFractionDigits: 2 });
+}
+
+// ★★★★☆ para un promedio de 0 a 5
+function estrellas(valor) {
+    const llenas = Math.round(valor);
+    return `<span class="estrellas" role="img" aria-label="${llenas} de 5 estrellas">`
+        + `<span class="llenas">${"★".repeat(llenas)}</span><span class="vacias">${"★".repeat(5 - llenas)}</span></span>`;
+}
+
+// imagen del producto; si no tiene (o no carga) se muestra la inicial del nombre
+function imagenHtml(producto, clase) {
+    const inicial = esc(producto.nombre.charAt(0).toUpperCase());
+    if (!producto.imagenUrl) return `<div class="${clase} sin-imagen" aria-hidden="true">${inicial}</div>`;
+    return `<img class="${clase}" src="${esc(producto.imagenUrl)}" alt="${esc(producto.nombre)}" loading="lazy" data-inicial="${inicial}">`;
+}
+
+// si una imagen no carga (URL rota), se reemplaza por la inicial. Se escucha en "captura" porque el error de <img> no burbujea
+document.addEventListener("error", (e) => {
+    const img = e.target;
+    if (img.tagName !== "IMG" || img.dataset.inicial === undefined) return;
+    const reemplazo = document.createElement("div");
+    reemplazo.className = img.className + " sin-imagen";
+    reemplazo.textContent = img.dataset.inicial;
+    img.replaceWith(reemplazo);
+}, true);
+
+function fechaHora(iso) {
+    return new Date(iso).toLocaleDateString("es-UY", { day: "numeric", month: "short", year: "numeric" });
 }
 
 // fecha de hoy en formato yyyy-mm-dd (hora local)
@@ -63,8 +94,25 @@ function guardarToken(token) {
     }
 }
 
-// ================= Login =================
-// No hay registro publico: los usuarios nuevos los crea alguien con sesion, desde la seccion Usuarios.
+// ================= Login / crear cuenta =================
+// Quien crea su cuenta queda como usuario normal (solo ve el catalogo). Los admin los nombra otro admin.
+
+let modoLogin = "login";
+
+document.querySelectorAll(".pestanias button").forEach((boton) =>
+    boton.addEventListener("click", () => cambiarModoLogin(boton.dataset.modo)));
+
+function cambiarModoLogin(modo) {
+    modoLogin = modo;
+    document.querySelectorAll(".pestanias button").forEach((b) => b.classList.toggle("activa", b.dataset.modo === modo));
+    const esRegistro = modo === "registro";
+    $("#campo-nombre").hidden = !esRegistro;
+    $("#form-login [name=nombre]").required = esRegistro;
+    $("#form-login [name=password]").autocomplete = esRegistro ? "new-password" : "current-password";
+    $("#form-login [name=password]").minLength = esRegistro ? 8 : 0;
+    $("#btn-login").textContent = esRegistro ? "Crear cuenta" : "Ingresar";
+    $("#error-login").hidden = true;
+}
 
 $("#form-login").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -73,7 +121,11 @@ $("#form-login").addEventListener("submit", async (e) => {
     boton.disabled = true;
     $("#info-login").hidden = true;
     try {
-        const respuesta = await api.login({ email: datos.get("email").trim(), password: datos.get("password") });
+        const credenciales = { email: datos.get("email").trim(), password: datos.get("password") };
+        // crear cuenta tambien devuelve el token: queda con la sesion iniciada
+        const respuesta = modoLogin === "registro"
+            ? await api.registro({ nombre: datos.get("nombre").trim(), ...credenciales })
+            : await api.login(credenciales);
         e.target.reset();
         guardarToken(respuesta.token);
         usarToken(respuesta.token);
@@ -93,14 +145,20 @@ function mostrarLogin(mensaje) {
     $("#info-login").textContent = mensaje || "";
     $("#info-login").hidden = !mensaje;
     if ($("#modal").open) $("#modal").close();
+    cambiarModoLogin("login");
 }
+
+const esAdmin = () => estado.usuario && estado.usuario.rol === "ADMIN";
 
 function iniciarSesion(usuario) {
     estado.usuario = usuario;
     $("#nombre-usuario").textContent = usuario.nombre;
+    $("#etiqueta-admin").hidden = !esAdmin();
+    // el usuario normal solo ve el catalogo
+    document.querySelectorAll(".solo-admin").forEach((el) => (el.hidden = !esAdmin()));
     $("#vista-login").hidden = true;
     $("#vista-app").hidden = false;
-    mostrarSeccion("productos");
+    mostrarSeccion(esAdmin() ? "productos" : "catalogo");
 }
 
 function cerrarSesion(mensaje) {
@@ -123,9 +181,11 @@ document.querySelectorAll(".nav button").forEach((boton) =>
     boton.addEventListener("click", () => mostrarSeccion(boton.dataset.seccion)));
 
 async function mostrarSeccion(nombre) {
+    if (nombre !== "catalogo" && !esAdmin()) nombre = "catalogo";
     document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("activa", b.dataset.seccion === nombre));
     document.querySelectorAll(".seccion").forEach((s) => (s.hidden = s.id !== "seccion-" + nombre));
     try {
+        if (nombre === "catalogo") await cargarCatalogo();
         if (nombre === "productos") await cargarProductos();
         if (nombre === "proveedores") await cargarProveedores();
         if (nombre === "compras") await prepararCompras();
@@ -175,6 +235,153 @@ $("#modal-form").addEventListener("click", (e) => {
     if (e.target.closest("#btn-agregar-linea, .quitar-linea")) $("#modal-error").hidden = true;
 });
 
+// ================= Catalogo =================
+
+let catalogo = [];
+
+async function cargarCatalogo() {
+    catalogo = await api.catalogo();
+    renderCatalogo();
+}
+
+function renderCatalogo() {
+    const filtro = $("#buscar-catalogo").value.trim().toLowerCase();
+    const lista = catalogo.filter((p) =>
+        !filtro || p.nombre.toLowerCase().includes(filtro) || (p.descripcion || "").toLowerCase().includes(filtro));
+
+    if (lista.length === 0) {
+        $("#catalogo").innerHTML = `<p class="vacio">${filtro ? "No hay productos que coincidan con la búsqueda." : "Todavía no hay productos en el catálogo."}</p>`;
+        return;
+    }
+    $("#catalogo").innerHTML = lista.map((p) => `
+        <button type="button" class="tarjeta" data-producto="${p.id}" aria-label="Ver ${esc(p.nombre)}">
+            ${imagenHtml(p, "tarjeta-imagen")}
+            <div class="tarjeta-cuerpo">
+                <span class="codigo">${esc(p.codigo)}</span>
+                <h3>${esc(p.nombre)}</h3>
+                <div class="valoracion">
+                    ${estrellas(p.promedioPuntaje)}
+                    <span>${p.cantidadResenas ? `(${p.cantidadResenas})` : "Sin reseñas"}</span>
+                </div>
+            </div>
+            <div class="tarjeta-pie">
+                <span class="precio">${plata(p.precioVenta)}</span>
+                <span class="etiqueta ${p.enStock ? "verde" : "gris"}">${p.enStock ? "En stock" : "Sin stock"}</span>
+            </div>
+        </button>`).join("");
+}
+
+$("#buscar-catalogo").addEventListener("input", renderCatalogo);
+
+$("#catalogo").addEventListener("click", (e) => {
+    const tarjeta = e.target.closest("[data-producto]");
+    if (tarjeta) verProducto(Number(tarjeta.dataset.producto));
+});
+
+// ----- Ficha del producto: descripcion, comentarios y reseñas -----
+
+let productoAbierto = null;
+
+async function verProducto(id) {
+    try {
+        const { producto, resenas } = await api.detalleProducto(id);
+        productoAbierto = producto.id;
+        renderDetalle(producto, resenas);
+        if (!$("#detalle").open) $("#detalle").showModal();
+    } catch (error) {
+        avisar(error.message, "error");
+    }
+}
+
+function renderDetalle(p, resenas) {
+    const mia = resenas.find((r) => r.usuarioId === estado.usuario.id);
+    const resumen = p.cantidadResenas
+        ? `<strong>${p.promedioPuntaje.toFixed(1)}</strong> · ${p.cantidadResenas} reseña${p.cantidadResenas > 1 ? "s" : ""}`
+        : "Sin reseñas todavía";
+
+    // selector de estrellas: 5 radios en orden inverso, asi el CSS puede pintar "esta y las anteriores"
+    const selector = [5, 4, 3, 2, 1].map((n) => `
+        <input type="radio" id="estrella-${n}" name="puntaje" value="${n}" ${mia && mia.puntaje === n ? "checked" : ""}>
+        <label for="estrella-${n}" title="${n} estrella${n > 1 ? "s" : ""}">★</label>`).join("");
+
+    $("#detalle-contenido").innerHTML = `
+        <div class="detalle-grid">
+            ${imagenHtml(p, "detalle-imagen")}
+            <div class="detalle-info">
+                <span class="codigo">${esc(p.codigo)}</span>
+                <h2>${esc(p.nombre)}</h2>
+                <div class="valoracion">${estrellas(p.promedioPuntaje)} <span>${resumen}</span></div>
+                <p class="precio grande">${plata(p.precioVenta)}</p>
+                <span class="etiqueta ${p.enStock ? "verde" : "gris"}">${p.enStock ? "En stock" : "Sin stock"}</span>
+                <h3>Descripción</h3>
+                <p class="texto-descripcion">${esc(p.descripcion) || "Este producto no tiene descripción."}</p>
+            </div>
+        </div>
+
+        <section class="resenas">
+            <h3>Comentarios y reseñas</h3>
+            <form id="form-resena" class="formulario form-resena">
+                <p class="form-resena-titulo">${mia ? "Tu reseña (podés cambiarla)" : "¿Lo usaste? Dejá tu reseña"}</p>
+                <div class="selector-estrellas" role="radiogroup" aria-label="Puntaje">${selector}</div>
+                <textarea name="comentario" rows="3" maxlength="1000" placeholder="Contá qué te pareció (opcional)">${mia ? esc(mia.comentario) : ""}</textarea>
+                <p class="error" id="error-resena" hidden></p>
+                <button type="submit" class="btn primario">${mia ? "Actualizar reseña" : "Publicar reseña"}</button>
+            </form>
+            <ul class="lista-resenas">
+                ${resenas.length === 0 ? `<li class="vacio">Nadie opinó todavía. ¡Sé el primero!</li>` : resenas.map((r) => `
+                <li class="resena">
+                    <div class="resena-cabecera">
+                        <strong>${esc(r.usuarioNombre)}${r.usuarioId === estado.usuario.id ? " (vos)" : ""}</strong>
+                        ${estrellas(r.puntaje)}
+                        <span class="resena-fecha">${fechaHora(r.fecha)}</span>
+                        ${r.usuarioId === estado.usuario.id || esAdmin()
+                            ? `<button type="button" class="btn chico peligro" data-borrar-resena="${r.id}">Borrar</button>` : ""}
+                    </div>
+                    ${r.comentario ? `<p>${esc(r.comentario)}</p>` : ""}
+                </li>`).join("")}
+            </ul>
+        </section>`;
+}
+
+// despues de publicar o borrar se recarga la ficha y, de fondo, el catalogo (para actualizar las estrellas de la tarjeta)
+async function refrescarProductoAbierto() {
+    await verProducto(productoAbierto);
+    cargarCatalogo().catch(() => {});
+}
+
+$("#detalle-contenido").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const datos = new FormData(e.target);
+    const error = $("#error-resena");
+    if (!datos.get("puntaje")) {
+        error.textContent = "Elegí de 1 a 5 estrellas";
+        error.hidden = false;
+        return;
+    }
+    try {
+        await api.publicarResena(productoAbierto, { puntaje: Number(datos.get("puntaje")), comentario: datos.get("comentario").trim() });
+        avisar("¡Gracias por tu reseña!");
+        await refrescarProductoAbierto();
+    } catch (err) {
+        error.textContent = err.message;
+        error.hidden = false;
+    }
+});
+
+$("#detalle-contenido").addEventListener("click", async (e) => {
+    const boton = e.target.closest("[data-borrar-resena]");
+    if (!boton || !confirm("¿Borrar esta reseña?")) return;
+    try {
+        await api.borrarResena(Number(boton.dataset.borrarResena));
+        avisar("Reseña borrada");
+        await refrescarProductoAbierto();
+    } catch (error) {
+        avisar(error.message, "error");
+    }
+});
+
+$("#detalle-cerrar").addEventListener("click", () => $("#detalle").close());
+
 // ================= Productos =================
 
 async function cargarProductos() {
@@ -199,7 +406,7 @@ function renderProductos() {
         !filtro || p.nombre.toLowerCase().includes(filtro) || p.codigo.toLowerCase().includes(filtro));
 
     if (lista.length === 0) {
-        $("#tabla-productos").innerHTML = `<tr><td colspan="8" class="vacio">No hay productos${filtro ? " que coincidan con la búsqueda" : ""}.</td></tr>`;
+        $("#tabla-productos").innerHTML = `<tr><td colspan="9" class="vacio">No hay productos${filtro ? " que coincidan con la búsqueda" : ""}.</td></tr>`;
         return;
     }
 
@@ -207,13 +414,21 @@ function renderProductos() {
         <tr class="${p.disponible ? "" : "apagada"}">
             <td class="codigo">${esc(p.codigo)}</td>
             <td>
-                <div class="nombre">${esc(p.nombre)}</div>
-                <div class="descripcion">${esc(p.descripcion)}</div>
+                <div class="producto-celda">
+                    ${imagenHtml(p, "miniatura")}
+                    <div>
+                        <div class="nombre">${esc(p.nombre)}</div>
+                        <div class="descripcion">${esc(p.descripcion)}</div>
+                    </div>
+                </div>
             </td>
             <td class="num ${p.stock <= p.stockMinimo ? "stock-bajo" : ""}">${p.stock}</td>
             <td class="num">${p.stockMinimo}</td>
             <td class="num">${plata(p.precioCompra)}</td>
             <td class="num">${plata(p.precioVenta)}</td>
+            <td class="proveedores">${(p.proveedores || []).length
+                ? p.proveedores.map(esc).join("<br>")
+                : `<span class="descripcion">Sin compras</span>`}</td>
             <td>
                 <button type="button" class="etiqueta ${p.disponible ? "verde" : "gris"}" data-disponible="${p.id}"
                         title="Clic para marcar como ${p.disponible ? "no disponible" : "disponible"}">
@@ -251,13 +466,15 @@ $("#tabla-productos").addEventListener("click", async (e) => {
 $("#btn-nuevo-producto").addEventListener("click", () => abrirFormularioProducto(null));
 
 function abrirFormularioProducto(producto) {
-    const p = producto || { nombre: "", descripcion: "", codigo: "", stock: 0, stockMinimo: 0, precioCompra: 0, precioVenta: 0 };
+    const p = producto || { nombre: "", descripcion: "", codigo: "", stock: 0, stockMinimo: 0, precioCompra: 0, precioVenta: 0, imagenUrl: "" };
     abrirModal({
         titulo: producto ? "Editar producto" : "Nuevo producto",
         cuerpo: `
             <label>Nombre <input name="nombre" required value="${esc(p.nombre)}"></label>
             <label>Descripción <textarea name="descripcion" rows="2">${esc(p.descripcion)}</textarea></label>
             <label>Código <input name="codigo" required value="${esc(p.codigo)}"></label>
+            <label>Imagen (URL) <input name="imagenUrl" placeholder="https://... (opcional)" value="${esc(p.imagenUrl || "")}"></label>
+            <p class="ayuda">Pegá el link de una imagen. Si queda vacío, en el catálogo se muestra la inicial del producto.</p>
             <div class="fila">
                 <label>Stock <input name="stock" type="number" min="0" step="1" required value="${p.stock}"></label>
                 <label>Stock mínimo <input name="stockMinimo" type="number" min="0" step="1" required value="${p.stockMinimo}"></label>
@@ -275,6 +492,7 @@ function abrirFormularioProducto(producto) {
                 stockMinimo: Number(datos.get("stockMinimo")),
                 precioCompra: Number(datos.get("precioCompra")),
                 precioVenta: Number(datos.get("precioVenta")),
+                imagenUrl: datos.get("imagenUrl").trim(),
             };
             // RF10 y el codigo repetido los valida el back; si falla, el mensaje se muestra en el modal
             if (producto) await api.productos.modificar(producto.id, cuerpo);
@@ -598,16 +816,40 @@ function renderUsuarios() {
             ? `<span class="etiqueta verde">Activo (vos)</span>`
             : `<button type="button" class="etiqueta ${u.activo ? "verde" : "gris"}" data-activo="${u.id}"
                        title="Clic para ${u.activo ? "desactivar" : "activar"}">${u.activo ? "Activo" : "Inactivo"}</button>`;
+        // el rol de uno mismo no se cambia (el back tambien lo impide), asi siempre queda al menos un admin
+        const rolHtml = soyYo
+            ? `<span class="etiqueta azul">Admin</span>`
+            : `<button type="button" class="etiqueta ${u.rol === "ADMIN" ? "azul" : "gris"}" data-rol="${u.id}"
+                       title="Clic para ${u.rol === "ADMIN" ? "pasar a usuario normal" : "hacer administrador"}">${u.rol === "ADMIN" ? "Admin" : "Usuario"}</button>`;
         return `
         <tr class="${u.activo ? "" : "apagada"}">
             <td class="nombre">${esc(u.nombre)}</td>
             <td>${esc(u.email)}</td>
+            <td>${rolHtml}</td>
             <td>${estadoHtml}</td>
         </tr>`;
     }).join("");
 }
 
 $("#tabla-usuarios").addEventListener("click", async (e) => {
+    const botonRol = e.target.closest("[data-rol]");
+    if (botonRol) {
+        const usuario = estado.usuarios.find((u) => u.id === Number(botonRol.dataset.rol));
+        const nuevoRol = usuario.rol === "ADMIN" ? "USUARIO" : "ADMIN";
+        const pregunta = nuevoRol === "ADMIN"
+            ? `¿Hacer administrador a ${usuario.nombre}? Va a poder gestionar todo.`
+            : `¿Quitarle el rol de administrador a ${usuario.nombre}? Solo va a ver el catálogo.`;
+        if (!confirm(pregunta)) return;
+        try {
+            await api.usuarios.cambiarRol(usuario.id, nuevoRol);
+            avisar(`${usuario.nombre} ahora es ${nuevoRol === "ADMIN" ? "administrador" : "usuario normal"}`);
+            await cargarUsuarios();
+        } catch (error) {
+            avisar(error.message, "error");
+        }
+        return;
+    }
+
     const boton = e.target.closest("[data-activo]");
     if (!boton) return;
     const usuario = estado.usuarios.find((u) => u.id === Number(boton.dataset.activo));
@@ -628,12 +870,19 @@ $("#btn-nuevo-usuario").addEventListener("click", () => {
             <label>Nombre <input name="nombre" required autocomplete="off"></label>
             <label>Email <input name="email" type="email" required autocomplete="off"></label>
             <label>Contraseña <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+            <label>Rol
+                <select name="rol">
+                    <option value="USUARIO">Usuario (solo ve el catálogo)</option>
+                    <option value="ADMIN">Administrador (gestiona todo)</option>
+                </select>
+            </label>
             <p class="ayuda">Mínimo 8 caracteres. El usuario la puede usar para iniciar sesión apenas se crea.</p>`,
         onGuardar: async (datos) => {
             await api.usuarios.crear({
                 nombre: datos.get("nombre").trim(),
                 email: datos.get("email").trim(),
                 password: datos.get("password"),
+                rol: datos.get("rol"),
             });
             avisar("Usuario creado");
             await cargarUsuarios();

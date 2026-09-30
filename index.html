@@ -14,9 +14,17 @@
             <h1 class="marca">Tecno<span>Shop</span></h1>
             <p class="subtitulo">Gestión de stock y compras</p>
 
+            <div class="pestanias" role="tablist">
+                <button type="button" data-modo="login" class="activa">Ingresar</button>
+                <button type="button" data-modo="registro">Crear cuenta</button>
+            </div>
+
             <p class="info" id="info-login" hidden></p>
 
             <form id="form-login" class="formulario">
+                <label id="campo-nombre" hidden>Nombre
+                    <input name="nombre" autocomplete="name">
+                </label>
                 <label>Email
                     <input name="email" type="email" required autocomplete="email">
                 </label>
@@ -34,21 +42,35 @@
         <header class="barra">
             <span class="marca">Tecno<span>Shop</span></span>
             <nav class="nav">
-                <button type="button" data-seccion="productos" class="activa">Productos</button>
-                <button type="button" data-seccion="proveedores">Proveedores</button>
-                <button type="button" data-seccion="compras">Compras</button>
-                <button type="button" data-seccion="usuarios">Usuarios</button>
+                <button type="button" data-seccion="catalogo">Catálogo</button>
+                <!-- solo-admin: se ocultan para los usuarios normales (el back igual rechaza esas rutas) -->
+                <button type="button" data-seccion="productos" class="solo-admin">Productos</button>
+                <button type="button" data-seccion="proveedores" class="solo-admin">Proveedores</button>
+                <button type="button" data-seccion="compras" class="solo-admin">Compras</button>
+                <button type="button" data-seccion="usuarios" class="solo-admin">Usuarios</button>
             </nav>
             <div class="usuario">
                 <span id="nombre-usuario"></span>
+                <span id="etiqueta-admin" class="etiqueta azul" hidden>Admin</span>
                 <button type="button" id="btn-salir" class="btn chico">Salir</button>
             </div>
         </header>
 
         <main class="contenido">
 
+            <!-- Catalogo: lo ven todos los usuarios -->
+            <section id="seccion-catalogo" class="seccion" hidden>
+                <div class="encabezado">
+                    <h2>Catálogo</h2>
+                    <div class="acciones">
+                        <input type="search" id="buscar-catalogo" placeholder="Buscar producto">
+                    </div>
+                </div>
+                <div id="catalogo" class="catalogo"></div>
+            </section>
+
             <!-- Productos (RF07 - RF10) -->
-            <section id="seccion-productos" class="seccion">
+            <section id="seccion-productos" class="seccion" hidden>
                 <div class="encabezado">
                     <h2>Productos</h2>
                     <div class="acciones">
@@ -67,6 +89,7 @@
                                 <th class="num">Mínimo</th>
                                 <th class="num">P. compra</th>
                                 <th class="num">P. venta</th>
+                                <th>Proveedores</th>
                                 <th>Estado</th>
                                 <th></th>
                             </tr>
@@ -158,6 +181,7 @@
                             <tr>
                                 <th>Nombre</th>
                                 <th>Email</th>
+                                <th>Rol</th>
                                 <th>Estado</th>
                             </tr>
                         </thead>
@@ -180,6 +204,12 @@
                 <button type="submit" class="btn primario" id="modal-guardar">Guardar</button>
             </div>
         </form>
+    </dialog>
+
+    <!-- Ficha de un producto del catalogo: descripcion y reseñas -->
+    <dialog id="detalle" class="detalle" aria-label="Detalle del producto">
+        <button type="button" class="btn chico cerrar" id="detalle-cerrar" aria-label="Cerrar">✕</button>
+        <div id="detalle-contenido"></div>
     </dialog>
 
     <div id="aviso" class="aviso" role="status" aria-live="polite"></div>

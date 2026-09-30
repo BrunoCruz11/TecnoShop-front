@@ -9,6 +9,7 @@ COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY index.html /usr/share/nginx/html/
 COPY css /usr/share/nginx/html/css
 COPY js /usr/share/nginx/html/js
+COPY img /usr/share/nginx/html/img
 
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD wget -qO /dev/null http://127.0.0.1:8080/ || exit 1

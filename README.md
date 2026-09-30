@@ -1,6 +1,6 @@
 # TecnoShop — Front
 
-Interfaz web de TecnoShop para gestionar productos, proveedores, compras y usuarios.
+Interfaz web de TecnoShop: un catálogo con reseñas para los clientes y la gestión de productos, proveedores, compras y usuarios para el administrador.
 
 Hecha en **HTML, CSS y JavaScript puro**: no usa frameworks ni hay que instalar nada para programarla.
 
@@ -64,7 +64,9 @@ Abrí **http://localhost:5500** e ingresá con:
 - **Email:** `admin@tecnoshop.com`
 - **Contraseña:** `admin1234`
 
-El back crea ese usuario la primera vez. **No hay registro público**: los usuarios nuevos se crean desde la sección **Usuarios**, con una sesión iniciada.
+El back crea ese usuario la primera vez, como **administrador**.
+
+Cualquiera puede crear su cuenta con **Crear cuenta** en el login. Esas cuentas son de **usuario normal** y solo ven el **Catálogo**. Un administrador puede cambiarle el rol a otro usuario desde la sección **Usuarios**.
 
 ### Para apagar
 
@@ -74,12 +76,13 @@ El back crea ese usuario la primera vez. **No hay registro público**: los usuar
 
 ## 4. Qué se puede hacer
 
-| Sección | Qué hace |
-|---|---|
-| **Productos** | Alta, edición, búsqueda y marcar disponible / no disponible. Muestra una alerta con los productos que están en o por debajo del stock mínimo. |
-| **Proveedores** | Alta, edición y baja. No deja borrar un proveedor que tiene compras. |
-| **Compras** | Registrar una compra con varios productos, verla, confirmarla (suma el stock) o cancelarla. Se puede filtrar por usuario, proveedor o fechas. |
-| **Usuarios** | Crear usuarios y activarlos o desactivarlos. Un usuario desactivado no puede entrar. |
+| Sección | Quién la ve | Qué hace |
+|---|---|---|
+| **Catálogo** | Todos | Una tarjeta por producto disponible, con imagen, precio en pesos ($U), estrellas y si hay stock. Tiene buscador. Al hacer clic se abre la ficha del producto con la descripción y las reseñas; cada usuario puede dejar una reseña (1 a 5 estrellas y un comentario) y editarla o borrarla. El admin puede borrar cualquier reseña. |
+| **Productos** | Admin | Alta, edición, búsqueda y marcar disponible / no disponible. Muestra una alerta con los productos que están en o por debajo del stock mínimo, y a qué proveedores se le compró cada producto (según las compras confirmadas). |
+| **Proveedores** | Admin | Alta, edición y baja. No deja borrar un proveedor que tiene compras. |
+| **Compras** | Admin | Registrar una compra con varios productos, verla, confirmarla (suma el stock) o cancelarla. Se puede filtrar por usuario, proveedor o fechas. |
+| **Usuarios** | Admin | Crear usuarios, activarlos o desactivarlos y cambiarles el rol. Un usuario desactivado no puede entrar. |
 
 ---
 
@@ -97,11 +100,12 @@ El back crea ese usuario la primera vez. **No hay registro público**: los usuar
 ## 6. Cómo está organizado
 
 ```
-index.html                    las pantallas: login, productos, proveedores, compras, usuarios
+index.html                    las pantallas: login, catálogo, productos, proveedores, compras, usuarios
 config.js                     la dirección del back (en desarrollo: http://localhost:8080/api)
 js/api.js                     todas las llamadas al back; agrega el token de sesión
 js/app.js                     la lógica de cada pantalla
 css/estilos.css               los estilos, con modo claro y oscuro automático
+img/productos/                ilustraciones de los productos de ejemplo
 nginx/default.conf.template   configuración de nginx para producción
 Dockerfile                    imagen de producción
 ```
