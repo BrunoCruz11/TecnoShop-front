@@ -165,7 +165,22 @@ function cerrarSesion(mensaje) {
     estado.usuario = null;
     guardarToken(null);
     usarToken(null);
+    borrarDatosEnPantalla();
     mostrarLogin(mensaje);
+}
+
+// Al salir se borra lo que quedo cargado (tablas del admin, catalogo, fichas abiertas),
+// asi el proximo que entre en la misma pestaña no tiene esos datos en la pagina aunque esten ocultos.
+function borrarDatosEnPantalla() {
+    estado.productos = [];
+    estado.proveedores = [];
+    estado.usuarios = [];
+    for (const id of ["tabla-productos", "tabla-proveedores", "tabla-compras", "tabla-usuarios", "catalogo", "alerta-stock", "filtro-proveedor", "detalle-contenido", "modal-cuerpo"]) {
+        $("#" + id).innerHTML = "";
+    }
+    $("#alerta-stock").hidden = true;
+    if ($("#detalle").open) $("#detalle").close();
+    if ($("#modal").open) $("#modal").close();
 }
 
 $("#btn-salir").addEventListener("click", () => cerrarSesion());
