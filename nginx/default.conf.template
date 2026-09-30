@@ -1,0 +1,46 @@
+# La imagen de nginx reemplaza ${API_UPSTREAM} y ${API_URL} con variables de entorno al arrancar.
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    server_tokens off;            # no mostrar la version de nginx
+    client_max_body_size 1m;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json;
+
+    # Encabezados de seguridad para el navegador
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    # CSP: solo se ejecutan scripts y estilos servidos por este mismo sitio (frena inyeccion de codigo / XSS)
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+
+    # La API: nginx reenvia /api/... al back, que no esta expuesto a internet
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;          # la IP real del cliente (para limitar intentos de login)
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+    }
+
+    # config.js se genera aca mismo con la URL de la API
+    location = /config.js {
+        default_type application/javascript;
+        expires -1;
+        return 200 'window.TECNOSHOP_CONFIG = { apiUrl: "${API_URL}" };';
+    }
+
+    # el html no se cachea, asi cada deploy se ve enseguida
+    location = /index.html {
+        expires -1;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+        expires 1h;
+    }
+}

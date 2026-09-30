@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TecnoShop</title>
+    <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+
+    <!-- ===== Login / registro ===== -->
+    <main id="vista-login" class="login" hidden>
+        <div class="login-tarjeta">
+            <h1 class="marca">Tecno<span>Shop</span></h1>
+            <p class="subtitulo">Gestión de stock y compras</p>
+
+            <p class="info" id="info-login" hidden></p>
+
+            <form id="form-login" class="formulario">
+                <label>Email
+                    <input name="email" type="email" required autocomplete="email">
+                </label>
+                <label>Contraseña
+                    <input name="password" type="password" required autocomplete="current-password">
+                </label>
+                <p class="error" id="error-login" hidden></p>
+                <button type="submit" class="btn primario ancho" id="btn-login">Ingresar</button>
+            </form>
+        </div>
+    </main>
+
+    <!-- ===== Aplicacion ===== -->
+    <div id="vista-app" hidden>
+        <header class="barra">
+            <span class="marca">Tecno<span>Shop</span></span>
+            <nav class="nav">
+                <button type="button" data-seccion="productos" class="activa">Productos</button>
+                <button type="button" data-seccion="proveedores">Proveedores</button>
+                <button type="button" data-seccion="compras">Compras</button>
+                <button type="button" data-seccion="usuarios">Usuarios</button>
+            </nav>
+            <div class="usuario">
+                <span id="nombre-usuario"></span>
+                <button type="button" id="btn-salir" class="btn chico">Salir</button>
+            </div>
+        </header>
+
+        <main class="contenido">
+
+            <!-- Productos (RF07 - RF10) -->
+            <section id="seccion-productos" class="seccion">
+                <div class="encabezado">
+                    <h2>Productos</h2>
+                    <div class="acciones">
+                        <input type="search" id="buscar-producto" placeholder="Buscar por nombre o código">
+                        <button type="button" class="btn primario" id="btn-nuevo-producto">Nuevo producto</button>
+                    </div>
+                </div>
+                <div id="alerta-stock" class="alerta" hidden></div>
+                <div class="tabla-contenedor">
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th class="num">Stock</th>
+                                <th class="num">Mínimo</th>
+                                <th class="num">P. compra</th>
+                                <th class="num">P. venta</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-productos"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Proveedores (RF04 - RF06) -->
+            <section id="seccion-proveedores" class="seccion" hidden>
+                <div class="encabezado">
+                    <h2>Proveedores</h2>
+                    <div class="acciones">
+                        <button type="button" class="btn primario" id="btn-nuevo-proveedor">Nuevo proveedor</button>
+                    </div>
+                </div>
+                <div class="tabla-contenedor">
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Teléfono</th>
+                                <th>Email</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-proveedores"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Compras (RF11 - RF17) -->
+            <section id="seccion-compras" class="seccion" hidden>
+                <div class="encabezado">
+                    <h2>Compras</h2>
+                    <div class="acciones">
+                        <button type="button" class="btn primario" id="btn-nueva-compra">Nueva compra</button>
+                    </div>
+                </div>
+                <div class="filtros">
+                    <label>Mostrar
+                        <select id="filtro-compras">
+                            <option value="todas">Todas</option>
+                            <option value="mias">Mis compras</option>
+                            <option value="proveedor">Por proveedor</option>
+                            <option value="fechas">Por rango de fechas</option>
+                        </select>
+                    </label>
+                    <label id="filtro-proveedor-campo" hidden>Proveedor
+                        <select id="filtro-proveedor"></select>
+                    </label>
+                    <label id="filtro-desde-campo" hidden>Desde
+                        <input type="date" id="filtro-desde">
+                    </label>
+                    <label id="filtro-hasta-campo" hidden>Hasta
+                        <input type="date" id="filtro-hasta">
+                    </label>
+                </div>
+                <div class="tabla-contenedor">
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th>N°</th>
+                                <th>Fecha</th>
+                                <th>Proveedor</th>
+                                <th>Usuario</th>
+                                <th class="num">Total</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-compras"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Usuarios (RF01 - RF03) -->
+            <section id="seccion-usuarios" class="seccion" hidden>
+                <div class="encabezado">
+                    <h2>Usuarios</h2>
+                    <div class="acciones">
+                        <button type="button" class="btn primario" id="btn-nuevo-usuario">Nuevo usuario</button>
+                    </div>
+                </div>
+                <div class="tabla-contenedor">
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-usuarios"></tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Ventana modal reutilizable para todos los formularios -->
+    <dialog id="modal">
+        <form id="modal-form" method="dialog" class="formulario">
+            <h3 id="modal-titulo"></h3>
+            <div id="modal-cuerpo"></div>
+            <p class="error" id="modal-error" hidden></p>
+            <div class="modal-pie">
+                <button type="button" class="btn" id="modal-cancelar">Cancelar</button>
+                <button type="submit" class="btn primario" id="modal-guardar">Guardar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <div id="aviso" class="aviso" role="status" aria-live="polite"></div>
+
+    <script src="config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
